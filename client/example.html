@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eBayClone GraphQL Client Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .query-section {
+            margin-bottom: 30px;
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            font-family: monospace;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🛒 eBayClone GraphQL API Client</h1>
+    
+    <div class="container">
+        <h2>Authentication</h2>
+        <div>
+            <input type="email" id="loginEmail" placeholder="Email" value="john@example.com">
+            <input type="password" id="loginPassword" placeholder="Password" value="password">
+            <button onclick="login()">Login</button>
+            <button onclick="logout()">Logout</button>
+        </div>
+        <div id="authResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>Custom GraphQL Query</h2>
+        <textarea id="customQuery" placeholder="Enter your GraphQL query here...">
+query GetListings {
+  listings {
+    id
+    title
+    price
+    user {
+      username
+    }
+  }
+}
+        </textarea>
+        <div>
+            <button onclick="executeCustomQuery()">Execute Query</button>
+            <button onclick="loadExampleQueries()">Load Example Queries</button>
+        </div>
+        <div id="customResult" class="result" style="display: none;"></div>
+    </div>
+
+    <div class="container">
+        <h2>Quick Examples</h2>
+        <button onclick="getUserExample()">Get User</button>
+        <button onclick="getListingsExample()">Get Listings</button>
+        <button onclick="createListingExample()">Create Listing</button>
+        <button onclick="getOrdersExample()">Get Orders</button>
+        <button onclick="createOrderExample()">Create Order</button>
+        <div id="quickResult" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        const GRAPHQL_ENDPOINT = 'http://localhost:4000/graphql';
+        let authToken = null;
+
+        // Helper function to make GraphQL requests
+        async function graphqlRequest(query, variables = {}) {
+            const headers = {
+                'Content-Type': 'application/json',
+            };
+            
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+
+            try {
+                const response = await fetch(GRAPHQL_ENDPOINT, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        query,
+                        variables,
+                    }),
+                });
+
+                const result = await response.json();
+                return result;
+            } catch (error) {
+                return { errors: [{ message: error.message }] };
+            }
+        }
+
+        // Display result in a container
+        function displayResult(containerId, result, isError = false) {
+            const container = document.getElementById(containerId);
+            container.style.display = 'block';
+            container.className = `result ${isError ? 'error' : 'success'}`;
+            container.textContent = JSON.stringify(result, null, 2);
+        }
+
+        // Login function
+        async function login() {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            const query = `
+                mutation Login($input: UserLoginInput!) {
+                    login(input: $input) {
+                        token
+                        user {
+                            id
+                            username
+                            email
+                        }
+                    }
+                }
+            `;
+
+            const variables = { input: { email, password } };
+            const result = await graphqlRequest(query, variables);
+
+            if (result.errors) {
+                displayResult('authResult', result.errors, true);
+            } else {
+                authToken = result.data.login.token;
+                displayResult('authResult', { message: 'Login successful', user: result.data.login.user });
+            }
+        }
+
+        // Logout function
+        async function logout() {
+            if (!authToken) {
+                displayResult('authResult', { message: 'Not logged in' }, true);
+                return;
+            }
+
+            const query = `
+                mutation Logout {
+                    logout {
+                        message
+                    }
+                }
+            `;
+
+            const result = await graphqlRequest(query);
+            authToken = null;
+            
+            if (result.errors) {
+                displayResult('authResult', result.errors, true);
+            } else {
+                displayResult('authResult', result.data.logout);
+            }
+        }
+
+        // Execute custom query
+        async function executeCustomQuery() {
+            const query = document.getElementById('customQuery').value;
+            const result = await graphqlRequest(query);
+            
+            if (result.errors) {
+                displayResult('customResult', result.errors, true);
+            } else {
+                displayResult('customResult', result.data);
+            }
+        }
+
+        // Load example queries
+        function loadExampleQueries() {
+            const examples = [
+                `# Get all listings
+query GetListings {
+  listings {
+    id
+    title
+    price
+    user {
+      username
+    }
+  }
+}`,
+                `# Get listings with filters
+query GetListingsFiltered {
+  listings(filter: { search: "phone", priceMax: 1000 }) {
+    id
+    title
+    price
+    condition
+  }
+}`,
+                `# Get user by ID
+query GetUser {
+  user(id: 1) {
+    id
+    username
+    email
+  }
+}`,
+                `# Create listing (requires auth)
+mutation CreateListing {
+  createListing(input: {
+    title: "Test Item"
+    description: "Test description"
+    price: 99.99
+    category: "test"
+    condition: NEW
+  }) {
+    id
+    title
+    price
+  }
+}`,
+                `# Get orders (requires auth)
+query GetOrders {
+  orders {
+    orders {
+      id
+      status
+      totalPrice
+      listing {
+        title
+      }
+    }
+    pagination {
+      total
+      pages
+    }
+  }
+}`
+            ];
+            
+            const randomExample = examples[Math.floor(Math.random() * examples.length)];
+            document.getElementById('customQuery').value = randomExample;
+        }
+
+        // Quick example functions
+        async function getUserExample() {
+            const query = `
+                query GetUser {
+                    user(id: 1) {
+                        id
+                        username
+                        email
+                    }
+                }
+            `;
+            const result = await graphqlRequest(query);
+            displayResult('quickResult', result.errors ? result.errors : result.data, !!result.errors);
+        }
+
+        async function getListingsExample() {
+            const query = `
+                query GetListings {
+                    listings {
+                        id
+                        title
+                        price
+                        user {
+                            username
+                        }
+                    }
+                }
+            `;
+            const result = await graphqlRequest(query);
+            displayResult('quickResult', result.errors ? result.errors : result.data, !!result.errors);
+        }
+
+        async function createListingExample() {
+            if (!authToken) {
+                displayResult('quickResult', { message: 'Please login first' }, true);
+                return;
+            }
+
+            const query = `
+                mutation CreateListing {
+                    createListing(input: {
+                        title: "Sample Item"
+                        description: "Sample description"
+                        price: 49.99
+                        category: "sample"
+                        condition: NEW
+                    }) {
+                        id
+                        title
+                        price
+                    }
+                }
+            `;
+            const result = await graphqlRequest(query);
+            displayResult('quickResult', result.errors ? result.errors : result.data, !!result.errors);
+        }
+
+        async function getOrdersExample() {
+            if (!authToken) {
+                displayResult('quickResult', { message: 'Please login first' }, true);
+                return;
+            }
+
+            const query = `
+                query GetOrders {
+                    orders {
+                        orders {
+                            id
+                            status
+                            totalPrice
+                        }
+                        pagination {
+                            total
+                        }
+                    }
+                }
+            `;
+            const result = await graphqlRequest(query);
+            displayResult('quickResult', result.errors ? result.errors : result.data, !!result.errors);
+        }
+
+        async function createOrderExample() {
+            if (!authToken) {
+                displayResult('quickResult', { message: 'Please login first' }, true);
+                return;
+            }
+
+            const query = `
+                mutation CreateOrder {
+                    createOrder(input: {
+                        listingId: 1
+                        quantity: 1
+                        shippingAddress: {
+                            street: "123 Test St"
+                            city: "Test City"
+                            country: "USA"
+                        }
+                    }) {
+                        id
+                        status
+                        totalPrice
+                    }
+                }
+            `;
+            const result = await graphqlRequest(query);
+            displayResult('quickResult', result.errors ? result.errors : result.data, !!result.errors);
+        }
+
+        // Load example query on page load
+        window.onload = function() {
+            loadExampleQueries();
+        };
+    </script>
+</body>
+</html>

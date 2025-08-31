@@ -1,0 +1,226 @@
+# Scalar types
+scalar DateTime
+scalar Upload
+
+# Enums
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum ListingCondition {
+  NEW
+  LIKE_NEW
+  GOOD
+  FAIR
+  POOR
+}
+
+# Error types
+type GraphQLError {
+  message: String!
+  code: String
+  details: String
+}
+
+# User types
+type User {
+  id: Int!
+  username: String!
+  email: String!
+}
+
+input UserCreateInput {
+  username: String!
+  email: String!
+  password: String!
+}
+
+input UserUpdateInput {
+  username: String
+  email: String
+  password: String
+}
+
+input UserLoginInput {
+  email: String!
+  password: String!
+}
+
+# Authentication types
+type AuthPayload {
+  token: String!
+  user: User!
+}
+
+# Address types
+type Address {
+  street: String!
+  city: String!
+  state: String
+  zipCode: String
+  country: String!
+}
+
+input AddressInput {
+  street: String!
+  city: String!
+  state: String
+  zipCode: String
+  country: String!
+}
+
+# Listing types
+type Listing {
+  id: Int!
+  title: String!
+  description: String!
+  price: Float!
+  category: String
+  condition: ListingCondition
+  location: String
+  images: [String!]
+  userId: Int!
+  user: User
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input ListingCreateInput {
+  title: String!
+  description: String!
+  price: Float!
+  category: String
+  condition: ListingCondition
+  location: String
+  images: [Upload!]
+}
+
+input ListingUpdateInput {
+  title: String
+  description: String
+  price: Float
+  category: String
+  condition: ListingCondition
+  location: String
+}
+
+input ListingFilterInput {
+  search: String
+  priceMin: Float
+  priceMax: Float
+  category: String
+  condition: ListingCondition
+}
+
+# Order types
+type Order {
+  id: Int!
+  userId: Int!
+  listingId: Int!
+  quantity: Int!
+  totalPrice: Float!
+  status: OrderStatus!
+  shippingAddress: Address!
+  buyerNotes: String
+  cancelReason: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  cancelledAt: DateTime
+  user: User
+  listing: Listing
+}
+
+input OrderCreateInput {
+  listingId: Int!
+  quantity: Int!
+  shippingAddress: AddressInput!
+  buyerNotes: String
+}
+
+input OrderUpdateInput {
+  quantity: Int
+  shippingAddress: AddressInput
+  buyerNotes: String
+}
+
+input OrderFilterInput {
+  userId: Int
+  status: OrderStatus
+}
+
+input PaginationInput {
+  page: Int = 1
+  limit: Int = 10
+}
+
+type PaginationInfo {
+  total: Int!
+  pages: Int!
+  currentPage: Int!
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+}
+
+type OrderConnection {
+  orders: [Order!]!
+  pagination: PaginationInfo!
+}
+
+# Success response type
+type SuccessResponse {
+  message: String!
+}
+
+# Cancel order response
+type CancelOrderResponse {
+  message: String!
+  order: Order!
+}
+
+# Root Query type
+type Query {
+  # User queries
+  user(id: Int!): User
+
+  # Listing queries
+  listing(id: Int!): Listing
+  listings(filter: ListingFilterInput): [Listing!]!
+
+  # Order queries (requires authentication)
+  order(id: Int!): Order
+  orders(filter: OrderFilterInput, pagination: PaginationInput): OrderConnection!
+}
+
+# Root Mutation type
+type Mutation {
+  # User mutations
+  createUser(input: UserCreateInput!): User!
+  updateUser(id: Int!, input: UserUpdateInput!): User!
+  deleteUser(id: Int!): SuccessResponse!
+
+  # Authentication mutations
+  login(input: UserLoginInput!): AuthPayload!
+  logout: SuccessResponse!
+
+  # Listing mutations (requires authentication)
+  createListing(input: ListingCreateInput!): Listing!
+  updateListing(id: Int!, input: ListingUpdateInput!): Listing!
+  deleteListing(id: Int!): SuccessResponse!
+
+  # Order mutations (requires authentication)
+  createOrder(input: OrderCreateInput!): Order!
+  updateOrder(id: Int!, input: OrderUpdateInput!): Order!
+  deleteOrder(id: Int!): SuccessResponse!
+  cancelOrder(id: Int!, cancelReason: String): CancelOrderResponse!
+  updateOrderStatus(id: Int!, status: OrderStatus!): Order!
+}
+
+# Subscription type for real-time updates
+type Subscription {
+  orderStatusChanged(orderId: Int): Order!
+  newListing: Listing!
+}
